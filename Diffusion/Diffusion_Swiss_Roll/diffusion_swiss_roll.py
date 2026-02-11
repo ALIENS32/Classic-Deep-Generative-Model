@@ -62,7 +62,7 @@ class MLP(nn.Module):
 
 # --- 扩散模型定义 ---
 class DiffusionModel(nn.Module):
-    def __init__(self, model: nn.Module, n_steps=40, device='cpu'):
+    def __init__(self, model: nn.Module, n_steps=40, begin_beta=1e-4, end_beta=0.02, device='cpu'):
         """
         初始化扩散模型。
         """
@@ -71,7 +71,7 @@ class DiffusionModel(nn.Module):
         self.device = device
 
         # 线性 Beta 调度
-        betas = torch.linspace(1e-4, 0.02, n_steps)
+        betas = torch.linspace(begin_beta, end_beta, n_steps)
         self.beta = betas.to(device)
         self.alpha = 1. - self.beta
         self.alpha_bar = torch.cumprod(self.alpha, dim=0)
@@ -175,7 +175,7 @@ def train(model, optimizer, nb_epochs=10000, batch_size=2048,
 
 # --- 绘图函数 ---
 @torch.no_grad()
-def plot(model, save_path="Imgs/diffusion_model.png", show=True):
+def plot(model, save_path="Diffusion/Diffusion_Swiss_Roll/swiss_roll_outputs", show=True):
     """
     绘制扩散过程和生成的样本。
     """
@@ -233,14 +233,16 @@ if __name__ == "__main__":
     LR = 1e-3                 # 学习率
     NOISE_LEVEL = 0.1         # 数据噪声
     SAVE_FREQ = 1000          # 图片保存频率
-    OUTPUT_DIR = 'Diffussion/swiss_roll_outputs'       # 图片保存目录
+    OUTPUT_DIR = 'Diffusion/Diffusion_Swiss_Roll/swiss_roll_outputs'       # 图片保存目录
+    BEGIN_BETA = 1e-4         # 扩散率开始值
+    END_BETA = 0.02           # 扩散率结束值
     # =============================
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     # 初始化 MLP 和扩散模型
     model_mlp = MLP(N=N_STEPS, data_dim=DATA_DIM, hidden_dim=HIDDEN_DIM).to(device)
-    diffusion_model = DiffusionModel(model_mlp, n_steps=N_STEPS, device=device)
+    diffusion_model = DiffusionModel(model_mlp, n_steps=N_STEPS, begin_beta=BEGIN_BETA, end_beta=END_BETA, device=device)
 
     # 设置优化器
     optimizer = torch.optim.Adam(diffusion_model.parameters(), lr=LR)
@@ -249,6 +251,3 @@ if __name__ == "__main__":
     print(f"正在 {device} 上开始训练...")
     train(diffusion_model, optimizer, nb_epochs=NB_EPOCHS, batch_size=BATCH_SIZE,
           noise_level=NOISE_LEVEL, save_freq=SAVE_FREQ, output_dir=OUTPUT_DIR, device=device)
-
-    # 绘图并保存最终结果
-    plot(diffusion_model)
