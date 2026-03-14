@@ -281,14 +281,14 @@ def train(model, optimizer, nb_epochs=10000, batch_size=2048,
         ).float().to(device)                                      # [B, 2]
 
         # ---- Step 2: 为每个样本独立采样随机时间步 ----
-        t = torch.randint(0, model.n_steps, (batch_size,)).to(device)  # [B]
+        t = torch.randint(0, model.n_steps, (batch_size,)).to(device)  # t:[B], t[i] 表示第i个样本的随机时间步
 
         # ---- Step 3: 前向加噪，同时得到真实噪声作为标签 ----
         xt, noise, t = model.forward_process(x0, t)              # xt [B,2], noise [B,2]
 
         # ---- Step 4a: 噪声预测网络推理 ----
-        pred_noise = model.model(xt, t)                           # ε̂_θ(x_t, t), [B, 2]
-
+        pred_noise = model.model(xt, t)                           # ε̂_θ(x_t, t), pred_noise [B, 2]
+        #* model.model 返回的是去噪网络实例，执行他的forward，进行噪声预测
         # ---- Step 4b: 计算简化 MSE 损失 ‖ε - ε̂_θ‖² ----
         loss = mse_loss(pred_noise, noise)
 
@@ -338,10 +338,11 @@ def plot(model, save_path="Diffusion/Diffusion_Swiss_Roll/swiss_roll_outputs",
     plt.figure(figsize=(10, 6))
 
     # ---- 准备真实数据 ----
-    x0 = sample_batch(5000)
+    x0 = sample_batch(5000) #* 生成包含5000个样本点的瑞士卷原始数据
     x0_tensor = torch.from_numpy(x0).float().to(model.device)
 
     # ---- 前向加噪：分别加噪到 t=T/2 和 t=T ----
+    #* model.n_steps 表示扩散步数
     t_mid = torch.full((5000,), model.n_steps // 2,
                        dtype=torch.long, device=model.device)
     t_end = torch.full((5000,), model.n_steps - 1,
@@ -350,10 +351,13 @@ def plot(model, save_path="Diffusion/Diffusion_Swiss_Roll/swiss_roll_outputs",
     x_end, _, _ = model.forward_process(x0_tensor, t_end)
 
     # ---- 第一行：绘制前向加噪的三个阶段（蓝色点云） ----
-    data = [x0, x_mid.cpu().numpy(), x_end.cpu().numpy()]
+    data = [x0, x_mid.cpu().numpy(), x_end.cpu().numpy()]   #* data[0] 表示原始(0时刻)瑞士卷数据，data[1] 表示T/2时刻的加噪数据，data[2] 表示T时刻的加噪数据
     for i, title in enumerate([r'$t=0$', r'$t=\frac{T}{2}$', r'$t=T$']):
-        plt.subplot(2, 3, 1 + i)
-        plt.scatter(data[i][:, 0], data[i][:, 1], alpha=.1, s=1)
+        #* i依次取值为0,1,2; title 依次取值为:'$t=0$', '$t=\frac{T}{2}$', '$t=T$'
+        plt.subplot(2, 3, 1 + i)    #* 整个页面是一个2x3的图， 现在在绘制第1+i(索引号) 个子图
+        plt.scatter(data[i][:, 0], data[i][:, 1], alpha=.1, s=1)    
+        #* data[i][:, 0] 表示 第i个数据(0/0.5T/T时刻) 的所有点的x坐标；data[i][:, 1] 表示 第i个数据(0/0.5T/T时刻) 的所有点的y坐标；
+        #* 这样，就绘制出了第i个数据的所有点.
         plt.xlim([-2, 2]); plt.ylim([-2, 2])
         plt.gca().set_aspect('equal')
         if i == 0:
@@ -362,10 +366,11 @@ def plot(model, save_path="Diffusion/Diffusion_Swiss_Roll/swiss_roll_outputs",
         plt.title(title, fontsize=17)
 
     # ---- 第二行：绘制反向生成的三个阶段（红色点云） ----
-    samples = model.sample(5000)
+    samples = model.sample(5000)    #* 用扩散模型生成5000个样本点
     n_samples = len(samples)     # T+1 个快照
     for i, t_idx in enumerate([0, n_samples // 2, n_samples - 1]):
-        plt.subplot(2, 3, 4 + i)
+        #* i依次取值为0,1,2; t_idx 依次取值为:0, T/2, T
+        plt.subplot(2, 3, 4 + i) #* 整个页面是一个2x3的图， 现在在绘制第1+i(索引号) 个子图
         plt.scatter(samples[t_idx][:, 0].cpu().numpy(),
                     samples[t_idx][:, 1].cpu().numpy(),
                     alpha=.1, s=1, c='r')
@@ -416,7 +421,7 @@ if __name__ == "__main__":
     diffusion_model = DiffusionModel(
         model_mlp, n_steps=N_STEPS,
         begin_beta=BEGIN_BETA, end_beta=END_BETA, device=device
-    )
+    )   #* 将噪声预测网络model_mlp输入给扩散模型，用于反向去噪过程
 
     # ---- 优化器 ----
     optimizer = torch.optim.Adam(diffusion_model.parameters(), lr=LR)
