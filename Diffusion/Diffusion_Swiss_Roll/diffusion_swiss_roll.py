@@ -134,6 +134,7 @@ class DiffusionModel(nn.Module):
         self.beta = betas.to(device)                             # [T]
         self.alpha = 1. - self.beta                              # α_t = 1 - β_t
         self.alpha_bar = torch.cumprod(self.alpha, dim=0)        # ᾱ_t = ∏_{s=1}^{t} α_s
+        #* 预先计算好alpha的乘积
         self.n_steps = n_steps
 
         # ---- 预计算前向加噪公式中的两个系数，避免重复开方 ----
